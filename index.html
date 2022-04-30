@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Project 2 Daniel Hauersperger</title>
+    <script src="https://d3js.org/d3.v3.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+</head>
+
+
+<style>
+
+</style>
+
+<body>
+    <div class="row row-cols-1 row-cols-md-2 g-4">
+        <div class="col">
+          <div class="card">
+            <div class="card-body" id="west-rankings">
+              <h5 class="card-title">West Rankings</h5>
+            </div>
+          </div>
+        </div>
+        <div class="col">
+          <div class="card">
+            <div class="card-body" id="east-rankings">
+              <h5 class="card-title">East Rankings</h5>
+            </div>
+          </div>
+        </div>
+    </div>
+
+    <script>
+         function drawRankings(rankings, svg_width=800, svg_height=400){
+            // Specify which columns to display
+            const keys_to_display = ["TEAM", "W", "L"];;
+            const display_names = ["Team", "W", "L"];
+
+            const west = d3.select("#west-rankings");
+            const west_rankings = rankings.filter(r => r.CONFERENCE == "West");
+            drawTable(west, west_rankings, keys_to_display, display_names);
+
+            const east = d3.select("#east-rankings");
+            const east_rankings = rankings.filter(r => r.CONFERENCE == "East");
+            drawTable(east, east_rankings, keys_to_display, display_names);
+            
+            // TODO: Clicking a row filters games shown to that team, e.g. row.onclick=changeGamesFilter(this.team)
+            // Alternately, can have sidebar open to team info
+            // Or, lazily expand a card with the info
+        }
+
+        function drawTable(selector, data, keys_to_display, display_names){
+            const table = selector.append("table")
+                .attr("class", "table")
+            // Add column headers
+            table.append("thead")
+                .attr("class", "table-dark")
+                .append("tr")
+                .selectAll("th")
+                .data(display_names)
+                .enter().append("th")
+                    .attr("scope", "col")
+                    .text(d => d);
+            // Create every row
+            const rows = table.append("tbody")
+                // .attr("class", )
+                .selectAll("tr")
+                    .data(data)
+                    .enter().append("tr");
+            // Put values in the rows
+            for (key of keys_to_display){
+                rows.append("td").text(d => d[key]);
+            }
+        }
+
+        d3.csv('data/games.csv', function (games) {
+            d3.csv('data/ranking.csv', function(rankings){
+                // TODO: drawGames(games);
+
+                // first, drawing from the csv
+                // for recent games, I'll need to create this myself from games.csv or pull the data myself
+                // probably best to calculate this on the fly for load speed
+                const last_rankings_date = d3.max(rankings, r => r.STANDINGSDATE)
+                recent_rankings = rankings.filter(r => r.STANDINGSDATE == last_rankings_date);
+                console.log(recent_rankings);
+                drawRankings(recent_rankings);
+            });
+        });
+
+
+    </script>
+
+</body>
+
+</html>
