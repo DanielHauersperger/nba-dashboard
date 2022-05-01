@@ -15,14 +15,14 @@
 <body>
     <div class="row row-cols-1 row-cols-md-2 g-4">
         <div class="col">
-          <div class="card">
+          <div class="card shadow-sm">
             <div class="card-body" id="west-rankings">
               <h5 class="card-title">West Rankings</h5>
             </div>
           </div>
         </div>
         <div class="col">
-          <div class="card">
+          <div class="card shadow-sm">
             <div class="card-body" id="east-rankings">
               <h5 class="card-title">East Rankings</h5>
             </div>
@@ -30,8 +30,12 @@
         </div>
     </div>
 
+    <!-- below styling based on https://codepen.io/Temmio/pen/gKGEYV -->
+    <div id="games" style="overflow-x: auto;" class="row flex-row flex-nowrap mt-4 pb-4 pt-2">
+    </div>
+
     <script>
-         function drawRankings(rankings, svg_width=800, svg_height=400){
+         function drawRankings(rankings) {
             // Specify which columns to display
             const keys_to_display = ["TEAM", "W", "L"];;
             const display_names = ["Team", "W", "L"];
@@ -49,7 +53,7 @@
             // Or, lazily expand a card with the info
         }
 
-        function drawTable(selector, data, keys_to_display, display_names){
+        function drawTable(selector, data, keys_to_display, display_names) {
             const table = selector.append("table")
                 .attr("class", "table")
             // Add column headers
@@ -73,17 +77,43 @@
             }
         }
 
-        d3.csv('data/games.csv', function (games) {
-            d3.csv('data/ranking.csv', function(rankings){
-                // TODO: drawGames(games);
+        function drawGames(games, teams) {
+            const getTeam = (team_id) => {
+                return teams.find(d => d.TEAM_ID == team_id).ABBREVIATION
+            }
 
-                // first, drawing from the csv
-                // for recent games, I'll need to create this myself from games.csv or pull the data myself
-                // probably best to calculate this on the fly for load speed
-                const last_rankings_date = d3.max(rankings, r => r.STANDINGSDATE)
-                recent_rankings = rankings.filter(r => r.STANDINGSDATE == last_rankings_date);
-                console.log(recent_rankings);
-                drawRankings(recent_rankings);
+            const cards = d3.select("#games")
+                .selectAll(".game_div")
+                .data(games)
+                .enter().append("div")
+                    .attr("class", "game_div col-3")
+                    .append("div")
+                    .attr("class", "card card-block align-items-center shadow-sm");
+            cards.append("h1").text(d => {
+                return `${getTeam(d.HOME_TEAM_ID)} vs ${getTeam(d.VISITOR_TEAM_ID)}`;
+            });
+            cards.append("h2").text(d => {
+                return `${d.PTS_home}-${d.PTS_away}`;
+            });
+
+            cards.append("p").text(d => d.GAME_DATE_EST);
+
+        }
+
+        d3.csv('data/games.csv', function (games) {
+            d3.csv('data/ranking.csv', function(rankings) {
+                d3.csv('data/teams.csv', function(teams){
+                    const last_games_date = d3.max(games, r => r.GAME_DATE_EST);
+                    recent_games = games.filter(r => r.GAME_DATE_EST == last_games_date);
+                    drawGames(recent_games, teams);
+
+                    // first, drawing from the csv
+                    // for recent games, I'll need to create this myself from games.csv or pull the data myself
+                    // probably best to calculate this on the fly for load speed
+                    const last_rankings_date = d3.max(rankings, r => r.STANDINGSDATE);
+                    recent_rankings = rankings.filter(r => r.STANDINGSDATE == last_rankings_date);
+                    drawRankings(recent_rankings);
+                });
             });
         });
 
