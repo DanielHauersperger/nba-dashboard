@@ -100,6 +100,7 @@
                     .attr("id", d => `${key}-${d[id_key]}`)
                     .text(d => d[key]);
             }
+            return table;
         }
 
         function drawGames(games, teams) {
@@ -128,18 +129,28 @@
                 const isExpanded = block.classed('expanded');
                 if(isExpanded) {
                     // un-expand the game (hide the details)
-                    block.classed('expanded', false);
+                    block.classed("expanded", false);
                     block.classed("col-6", false);
                     
                     // remove the table of game stats
-                    block.select(".card").select("table").remove();
+                    block.select(".card").selectAll("table").remove();
                 } else {
                     // expand the game
-                    block.classed('expanded', true);
+                    block.classed("expanded", true);
                     block.classed("col-6", true);
 
                     const card = block.select(".card");
-                    drawTable(card, [d], ["FG_PCT_home", "FG_PCT_away"], ["FG_PCT_home", "FG_PCT_away"]);
+                    const row = card.append("div").attr("class", "row row-cols-1 row-cols-lg-2");
+                    const table1 = row.append("div").attr("class", "col")
+                        .append("div").attr("class", "card shadow-sm");
+                    const table2 = row.append("div").attr("class", "col")
+                        .append("div").attr("class", "card shadow-sm");
+
+                    const summary_team1 = [d];
+                    const summary_team2 = [d];
+                    drawTable(table1, summary_team1, ["PTS_home", "FG_PCT_home"], ["Points", "FG %"]);
+                    drawTable(table2, summary_team2, ["PTS_away", "FG_PCT_away"], ["Points", "FG %"]);
+
                 }
             });
         }
@@ -168,6 +179,7 @@
                 .tickFormat("");
 
             var svg = d3.select(`#${svg_id}`).append("svg")
+                .attr("class", "d-none d-sm-inline") // hide on small screens
                 .attr("width", width + margin.left + margin.right)
                 .attr("height", height + margin.top + margin.bottom)
             .append("g")
@@ -204,6 +216,8 @@
         d3.csv('data/games.csv', function (games) {
             d3.csv('data/ranking.csv', function(rankings) {
                 d3.csv('data/teams.csv', function(teams){
+                    d3.csv('data/games_details_2021.csv', function(details) {
+                    console.log(details.slice(0,10));
                     const last_games_date = d3.max(games, r => r.GAME_DATE_EST);
                     recent_games = games.filter(r => r.GAME_DATE_EST == last_games_date);
                     drawGames(recent_games, teams);
@@ -215,6 +229,7 @@
                     const games_this_season = games.filter(d => d.SEASON == '2021');
                     recent_rankings = rankings.filter(r => r.STANDINGSDATE == last_rankings_date);
                     drawRankings(recent_rankings, games_this_season, teams);
+                    });
                 });
             });
         });
