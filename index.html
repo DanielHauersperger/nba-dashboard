@@ -103,7 +103,7 @@
             return table;
         }
 
-        function drawGames(games, teams) {
+        function drawGames(games, teams, game_details) {
             const getTeam = (team_id) => {
                 return teams.find(d => d.TEAM_ID == team_id).ABBREVIATION
             }
@@ -125,7 +125,8 @@
             blocks.append("p").text(d => d.GAME_DATE_EST);
 
             cards.on("click", function(d) {
-                const block = d3.select(`#game-${d.GAME_ID}`);
+                const game_id = d.GAME_ID;
+                const block = d3.select(`#game-${game_id}`);
                 const isExpanded = block.classed('expanded');
                 if(isExpanded) {
                     // un-expand the game (hide the details)
@@ -133,24 +134,39 @@
                     block.classed("col-6", false);
                     
                     // remove the table of game stats
-                    block.select(".card").selectAll("table").remove();
+                    block.select(".card").selectAll(".details").remove();
                 } else {
                     // expand the game
                     block.classed("expanded", true);
                     block.classed("col-6", true);
 
                     const card = block.select(".card");
-                    const row = card.append("div").attr("class", "row row-cols-1 row-cols-lg-2");
-                    const table1 = row.append("div").attr("class", "col")
-                        .append("div").attr("class", "card shadow-sm");
-                    const table2 = row.append("div").attr("class", "col")
-                        .append("div").attr("class", "card shadow-sm");
+                    const row = card.append("div").attr("class", "details row row-cols-1 row-cols-lg-2");
 
-                    const summary_team1 = [d];
-                    const summary_team2 = [d];
-                    drawTable(table1, summary_team1, ["PTS_home", "FG_PCT_home"], ["Points", "FG %"]);
-                    drawTable(table2, summary_team2, ["PTS_away", "FG_PCT_away"], ["Points", "FG %"]);
+                    const single_game_details = game_details.filter(r => r.GAME_ID == d.GAME_ID);
+                    // draw a summary table for each team
+                    for (let isHome of [true, false]){
+                        console.log(isHome);
+                        const team = isHome ? d.TEAM_ID_home : d.TEAM_ID_away;
+                        const team_details = single_game_details.filter(d => d.TEAM_ID == team);
+                        
+                        const PTS = isHome ? d.PTS_home : d.PTS_away;
+                        const FGA = d3.sum(team_details, d => d.FGA);
+                        const FGM = d3.sum(team_details, d => d.FGM);
+                        const FG3M = d3.sum(team_details, d => d.FG3M);
+                        const FG3A = d3.sum(team_details, d => d.FG3A);
+                        const summary_team = [{
+                            "Points": PTS,
+                            "Field Goals": `${FGM}/${FGA} (${Math.round(FGM/FGA*100)}%)`, // e.g. '33/99 (33%)'
+                            "3 Pointers": `${FG3M}/${FG3A} (${Math.round(FG3M/FG3A*100)}%)`, // e.g. '5/15 (33%)'
+                        }];
+                        const columns = Object.keys(summary_team[0]);
 
+                        const table = row.append("div").attr("class", "col")
+                            .append("div").attr("class", "card shadow-sm");
+                        table.append("h5").text(team_details[0].TEAM_CITY)
+                        drawTable(table, summary_team, columns, columns);
+                    }
                 }
             });
         }
@@ -216,11 +232,10 @@
         d3.csv('data/games.csv', function (games) {
             d3.csv('data/ranking.csv', function(rankings) {
                 d3.csv('data/teams.csv', function(teams){
-                    d3.csv('data/games_details_2021.csv', function(details) {
-                    console.log(details.slice(0,10));
+                    d3.csv('data/games_details_2021.csv', function(game_details) {
                     const last_games_date = d3.max(games, r => r.GAME_DATE_EST);
                     recent_games = games.filter(r => r.GAME_DATE_EST == last_games_date);
-                    drawGames(recent_games, teams);
+                    drawGames(recent_games, teams, game_details);
 
                     // first, drawing from the csv
                     // for recent games, I'll need to create this myself from games.csv or pull the data myself
