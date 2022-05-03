@@ -55,10 +55,10 @@
 
         function drawTable(selector, data, keys_to_display, display_names) {
             const table = selector.append("table")
-                .attr("class", "table")
+                .classed("table", true)
             // Add column headers
             table.append("thead")
-                .attr("class", "table-dark")
+                .classed("table-dark", true)
                 .append("tr")
                 .selectAll("th")
                 .data(display_names)
@@ -87,17 +87,36 @@
                 .data(games)
                 .enter().append("div")
                     .attr("class", "game_div col-3")
-                    .append("div")
+                    .attr("id", d => `game-${d.GAME_ID}`)
+            const blocks = cards.append("div")
                     .attr("class", "card card-block align-items-center shadow-sm");
-            cards.append("h1").text(d => {
+            blocks.append("h1").text(d => {
                 return `${getTeam(d.HOME_TEAM_ID)} vs ${getTeam(d.VISITOR_TEAM_ID)}`;
             });
-            cards.append("h2").text(d => {
+            blocks.append("h2").text(d => {
                 return `${d.PTS_home}-${d.PTS_away}`;
             });
+            blocks.append("p").text(d => d.GAME_DATE_EST);
 
-            cards.append("p").text(d => d.GAME_DATE_EST);
+            cards.on("click", function(d) {
+                const block = d3.select(`#game-${d.GAME_ID}`);
+                const isExpanded = block.classed('expanded');
+                if(isExpanded) {
+                    // un-expand the game (hide the details)
+                    block.classed('expanded', false);
+                    block.classed("col-6", false);
+                    
+                    // remove the table of game stats
+                    block.select(".card").select("table").remove();
+                } else {
+                    // expand the game
+                    block.classed('expanded', true);
+                    block.classed("col-6", true);
 
+                    const card = block.select(".card");
+                    drawTable(card, [d], ["FG_PCT_home", "FG_PCT_away"], ["FG_PCT_home", "FG_PCT_away"]);
+                }
+            });
         }
 
         d3.csv('data/games.csv', function (games) {
