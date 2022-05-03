@@ -21,6 +21,11 @@
     .bar--positive {
         fill: blue
     }
+
+    .details {
+        font-size: 80%;
+        overflow: auto;
+    }
 </style>
 
 <body>
@@ -146,7 +151,6 @@
                     const single_game_details = game_details.filter(r => r.GAME_ID == d.GAME_ID);
                     // draw a summary table for each team
                     for (let isHome of [true, false]){
-                        console.log(isHome);
                         const team = isHome ? d.TEAM_ID_home : d.TEAM_ID_away;
                         const team_details = single_game_details.filter(d => d.TEAM_ID == team);
                         
@@ -157,8 +161,8 @@
                         const FG3A = d3.sum(team_details, d => d.FG3A);
                         const summary_team = [{
                             "Points": PTS,
-                            "Field Goals": `${FGM}/${FGA} (${Math.round(FGM/FGA*100)}%)`, // e.g. '33/99 (33%)'
-                            "3 Pointers": `${FG3M}/${FG3A} (${Math.round(FG3M/FG3A*100)}%)`, // e.g. '5/15 (33%)'
+                            "Field Goals": ratioString(FGM, FGA),
+                            "3 Pointers": ratioString(FG3M, FG3A),
                         }];
                         const columns = Object.keys(summary_team[0]);
 
@@ -166,9 +170,29 @@
                             .append("div").attr("class", "card shadow-sm");
                         table.append("h5").text(team_details[0].TEAM_CITY)
                         drawTable(table, summary_team, columns, columns);
+
+                        // Add individual player stats
+                        const player_stats = team_details.map(p => ({
+                            "Player": p.PLAYER_NAME,
+                            "Position": p.START_POSITION,
+                            "Min": p.MIN,
+                            "Comment": p.COMMENT,
+                            "Points": p.PTS,
+                            "Field Goals": ratioString(p.FGM, p.FGA),
+                        }));
+                        const columns2 = Object.keys(player_stats[0]);
+                        drawTable(table, player_stats, columns2, columns2);
+
                     }
                 }
             });
+        }
+
+        function ratioString(numerator, denominator){
+            if(denominator > 0){
+                return `${numerator}/${denominator} (${Math.round(numerator/denominator*100)}%)`; // e.g. '33/99 (33%)'
+            }
+            return "";
         }
 
         function drawSmallBar(svg_id, data) {
