@@ -4,7 +4,9 @@
 <head>
     <title>Project 2 Daniel Hauersperger</title>
     <script src="https://d3js.org/d3.v3.min.js"></script>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-ka7Sk0Gln4gmtz2MlQnikT1wXgYsOg+OMhuP+IlRH9sENBO0LRn5q+8nbTov4+1p" crossorigin="anonymous"></script>
+
 </head>
 
 
@@ -12,7 +14,7 @@
     .axis path,
     .axis line {
         stroke: black;
-        stroke-width: 1;
+        stroke-width: 0.8;
         shape-rendering: crispEdges;
     }
     .bar--negative {
@@ -24,34 +26,39 @@
 
     .details {
         font-size: 80%;
+        /* word-break:break-all; */
         overflow: auto;
     }
 </style>
 
 <body>
-    <div class="row row-cols-1 row-cols-md-2 g-4">
-        <div class="col">
-          <div class="card shadow-sm">
-            <div class="card-body" id="west-rankings">
-              <h5 class="card-title">West Rankings</h5>
+    <!-- <div class="row row-cols-1"> -->
+        <div class="col-12 col-lg-8 mx-auto">
+            <div class="row row-cols-1 row-cols-sm-2 g-4">
+                <div class="col">
+                <div class="card shadow-sm">
+                    <div class="card-body" id="west-rankings">
+                    <h5 class="card-title">West Rankings</h5>
+                    </div>
+                </div>
+                </div>
+                <div class="col">
+                <div class="card shadow-sm">
+                    <div class="card-body" id="east-rankings">
+                    <h5 class="card-title">East Rankings</h5>
+                    </div>
+                </div>
+                </div>
             </div>
-          </div>
-        </div>
-        <div class="col">
-          <div class="card shadow-sm">
-            <div class="card-body" id="east-rankings">
-              <h5 class="card-title">East Rankings</h5>
-            </div>
-          </div>
-        </div>
-    </div>
 
-    <!-- below styling based on https://codepen.io/Temmio/pen/gKGEYV -->
-    <div id="games" style="overflow-x: auto;" class="row flex-row flex-nowrap mt-4 pb-4 pt-2">
-    </div>
+            <!-- below styling based on https://codepen.io/Temmio/pen/gKGEYV -->
+            <div id="games" style="overflow-x: auto;" class="row flex-row flex-nowrap mt-4 pb-4 pt-2">
+            </div>
+    
+        </div>
 
     <script>
-         function drawRankings(rankings, games_this_season, teams) {
+         function drawRankings(rankings, games_this_season, game_details, teams) {
             // Specify which columns to display
             const keys_to_display = ["TEAM", "W", "L"];;
             const display_names = ["Team", "W", "L"];
@@ -68,8 +75,8 @@
             // Alternately, can have sidebar open to team info
             // Or, lazily expand a card with the info
 
-            // Add a bar plot of recent performance for each team
             for(team of rankings){
+                // Add a bar plot of recent performance for each team
                 const team_id = team.TEAM_ID;
                 const city = teams.filter(d => d.TEAM_ID == team_id)[0].CITY;
                 const team_games = games_this_season.filter(d => d.HOME_TEAM_ID == team_id || d.AWAY_TEAM_ID == team_id);
@@ -77,13 +84,46 @@
                 const last_10_games = last_n(team_games, "GAME_DATE_EST");
                 const display = last_10_games.map(d => ({"key": d.GAME_DATE_EST, "value":d.PTS_away - d.PTS_home}));
                 drawSmallBar(`TEAM-${team_id}`, display);
+
+                // When a team is clicked, filter games to that team
+                // (on clicking the team again, the filter is removed)
+                d3.select(`#row-${team_id}`).style("cursor", "pointer");
+                // show hover effect unless row is selected
+                d3.select(`#row-${team_id}`).on("mouseover", d => {
+                    const row = d3.select(`#row-${team_id}`);
+                    row.classed("bg-info", !row.classed("bg-primary"));
+                });
+                // remove hover effect
+                d3.select(`#row-${team_id}`).on("mouseout", d => d3.select(`#row-${team_id}`).classed("bg-info", false));
+
+                d3.select(`#row-${team_id}`).on("click", () => {
+                    const row = d3.select(`#row-${team_id}`);
+                    const classed = d3.select(`#row-${team_id}`).classed("bg-primary");
+                    if (classed) {
+                        // row is currently selected, so un-select it
+                        row.classed("bg-primary", false);
+
+                        // remove the filter
+                        const selected_games = last_n(games_this_season, 'GAME_DATE_EST', 50);
+                        drawGames(selected_games, teams, game_details); 
+                    } else {
+                        // row not currently selected, so un-select all others and select it
+                        d3.selectAll("tr").classed("bg-primary", false);
+                        row.classed("bg-primary", true);
+                        row.classed("bg-info", false); // remove hover effect from row
+                        
+                        // filter games by this team
+                        const team_games = games_this_season.filter(d => d.TEAM_ID_home == team_id || d.TEAM_ID_away == team_id);
+                        drawGames(team_games, teams, game_details); 
+                    }
+                });
             }
         }
 
         function drawTable(selector, data, keys_to_display, display_names, id_key=0) {
             const table = selector.append("table")
                 .classed("table", true)
-                .classed("table-hove", true);
+                // .classed("table-responsive", true);
             // Add column headers
             table.append("thead")
                 .classed("table-dark", true)
@@ -98,7 +138,8 @@
                 // .attr("class", )
                 .selectAll("tr")
                     .data(data)
-                    .enter().append("tr");
+                    .enter().append("tr")
+                    .attr("id", d => `row-${d[id_key]}`);
             // Put values in the rows
             for (key of keys_to_display){
                 rows.append("td")
@@ -113,6 +154,9 @@
                 return teams.find(d => d.TEAM_ID == team_id).ABBREVIATION
             }
 
+            // start from scratch
+            d3.select("#games").selectAll("*").remove();
+
             const cards = d3.select("#games")
                 .selectAll(".game_div")
                 .data(games)
@@ -120,7 +164,7 @@
                     .attr("class", "game_div col-3")
                     .attr("id", d => `game-${d.GAME_ID}`)
             const blocks = cards.append("div")
-                    .attr("class", "card card-block align-items-center shadow-sm");
+                    .attr("class", "card card-block align-items-center shadow-sm details");
             blocks.append("h1").text(d => {
                 return `${getTeam(d.HOME_TEAM_ID)} vs ${getTeam(d.VISITOR_TEAM_ID)}`;
             });
@@ -129,65 +173,96 @@
             });
             blocks.append("p").text(d => d.GAME_DATE_EST);
 
-            cards.on("click", function(d) {
+            // Add an accordion (expandable widget) to each game card to view more stats, see https://getbootstrap.com/docs/5.0/components/accordion/
+            // Within each accordion, there is a nav to switch between stats views, see https://getbootstrap.com/docs/5.1/components/navs-tabs/
+            blocks.append("div").html(
+                d => 
+                `<div class="accordion" id="gameStatsAccordion${d.GAME_ID}">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingOne">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" onclick="toggleGameFocus('${d.GAME_ID}')" data-bs-target="#gameStats${d.GAME_ID}" aria-expanded="false" aria-controls="collapseOne">
+                            Game Stats
+                        </button>
+                        </h2>
+                        <div id="gameStats${d.GAME_ID}" class="accordion-collapse collapse" aria-labelledby="headingOne" data-bs-parent="#gameStatsAccordion${d.GAME_ID}">
+                        <div class="accordion-body">
+                            <nav class="details" id="nav-${d.GAME_ID}">
+                                <div class="nav nav-tabs" id="nav-tab${d.GAME_ID}" role="tablist">
+                                <button class="nav-link active" id="nav-both-tab${d.GAME_ID}" data-bs-toggle="tab" data-bs-target="#nav-both${d.GAME_ID}" type="button" role="tab" aria-controls="nav-both${d.GAME_ID}" aria-selected="true">Summary</button>
+                                <button class="nav-link" id="nav-home-tab${d.GAME_ID}" data-bs-toggle="tab" data-bs-target="#nav-home${d.GAME_ID}" type="button" role="tab" aria-controls="nav-profile${d.GAME_ID}" aria-selected="false">Home</button>
+                                <button class="nav-link" id="nav-away-tab${d.GAME_ID}" data-bs-toggle="tab" data-bs-target="#nav-away${d.GAME_ID}" type="button" role="tab" aria-controls="nav-away${d.GAME_ID}" aria-selected="false">Away</button>
+                                </div>
+                            </nav>
+                            <div class="tab-content" id="nav-tabContent${d.GAME_ID}">
+                                <div class="tab-pane fade show active" id="nav-both${d.GAME_ID}" role="tabpanel" aria-labelledby="nav-both-tab${d.GAME_ID}"></div>
+                                <div class="tab-pane fade" id="nav-home${d.GAME_ID}" role="tabpanel" aria-labelledby="nav-home-tab${d.GAME_ID}"></div>
+                                <div class="tab-pane fade" id="nav-away${d.GAME_ID}" role="tabpanel" aria-labelledby="nav-away-tab${d.GAME_ID}"></div>
+                            </div>
+                        </div>
+                        </div>
+                    </div>
+                </div>`
+            )
+            blocks.each(d => {
                 const game_id = d.GAME_ID;
-                const block = d3.select(`#game-${game_id}`);
-                const isExpanded = block.classed('expanded');
-                if(isExpanded) {
-                    // un-expand the game (hide the details)
-                    block.classed("expanded", false);
-                    block.classed("col-6", false);
+                const single_game_details = game_details.filter(r => r.GAME_ID == d.GAME_ID);
+                for (let isHome of [true, false]){
+                    const team = isHome ? d.TEAM_ID_home : d.TEAM_ID_away;
+                    const team_details = single_game_details.filter(d => d.TEAM_ID == team);
                     
-                    // remove the table of game stats
-                    block.select(".card").selectAll(".details").remove();
-                } else {
-                    // expand the game
-                    block.classed("expanded", true);
-                    block.classed("col-6", true);
-
-                    const card = block.select(".card");
-                    const row = card.append("div").attr("class", "details row row-cols-1 row-cols-lg-2");
-
-                    const single_game_details = game_details.filter(r => r.GAME_ID == d.GAME_ID);
                     // draw a summary table for each team
-                    for (let isHome of [true, false]){
-                        const team = isHome ? d.TEAM_ID_home : d.TEAM_ID_away;
-                        const team_details = single_game_details.filter(d => d.TEAM_ID == team);
-                        
-                        const PTS = isHome ? d.PTS_home : d.PTS_away;
-                        const FGA = d3.sum(team_details, d => d.FGA);
-                        const FGM = d3.sum(team_details, d => d.FGM);
-                        const FG3M = d3.sum(team_details, d => d.FG3M);
-                        const FG3A = d3.sum(team_details, d => d.FG3A);
-                        const summary_team = [{
-                            "Points": PTS,
-                            "Field Goals": ratioString(FGM, FGA),
-                            "3 Pointers": ratioString(FG3M, FG3A),
-                        }];
-                        const columns = Object.keys(summary_team[0]);
+                    const team_sum = (key) => d3.sum(team_details, d => d[key]);
+                    const PTS = d3.sum(team_details, d => d.PTS);
+                    const FGA = d3.sum(team_details, d => d.FGA);
+                    const FGM = d3.sum(team_details, d => d.FGM);
+                    const FG3M = d3.sum(team_details, d => d.FG3M);
+                    const FG3A = d3.sum(team_details, d => d.FG3A);
+                    const summary_team = [{
+                        "Points": team_sum('PTS'),
+                        "Field Goals": ratioString(team_sum('FGM'), team_sum('FGA')),
+                        "3 Point": ratioString(team_sum('FG3M'), team_sum('FG3A')),
+                        "FT": ratioString(team_sum('FTM'), team_sum('FTA')),
+                        "REB": team_sum('REB'),
+                        "AST": team_sum('AST'),
+                        "BLK": team_sum('BLK'),
+                        "TO": team_sum('TO'),
+                    }];
+                    const columns = Object.keys(summary_team[0]);
+                    const accordionItemBoth = d3.select(`#nav-both${d.GAME_ID}`);
+                    accordionItemBoth.append("text").text(team_details[0].TEAM_CITY);
+                    drawTable(accordionItemBoth, summary_team, columns, columns);
 
-                        const table = row.append("div").attr("class", "col")
-                            .append("div").attr("class", "card shadow-sm");
-                        table.append("h5").text(team_details[0].TEAM_CITY)
-                        drawTable(table, summary_team, columns, columns);
-
-                        // Add individual player stats
-                        const player_stats = team_details.map(p => ({
-                            "Player": p.PLAYER_NAME,
-                            "Position": p.START_POSITION,
-                            "Min": p.MIN,
-                            "Comment": p.COMMENT,
-                            "Points": p.PTS,
-                            "Field Goals": ratioString(p.FGM, p.FGA),
-                        }));
-                        const columns2 = Object.keys(player_stats[0]);
-                        drawTable(table, player_stats, columns2, columns2);
-
-                    }
+                    // Add table for individual player stats on team
+                    const player_stats = team_details.map(p => ({
+                        "Player": p.PLAYER_NAME,
+                        "Position": p.START_POSITION,
+                        "Min": p.MIN,
+                        "Comment": p.COMMENT,
+                        "Points": p.PTS,
+                        "Field Goals": ratioString(p.FGM, p.FGA),
+                        "3 Point": ratioString(p.FG3M, p.FG3A),
+                        "FT": ratioString(p.FTM, p.FTA),
+                        "REB": p.REB,
+                        "AST": p.AST,
+                        "BLK": p.BLK,
+                        "TO": p.TO,
+                    }));
+                    const columns2 = Object.keys(player_stats[0]);
+                    const homeAway = isHome ? "home" : "away";
+                    const accordionItemTeam = d3.select(`#nav-${homeAway}${d.GAME_ID}`);
+                    drawTable(accordionItemTeam, player_stats, columns2, columns2);
                 }
             });
         }
 
+        function toggleGameFocus(game_id){
+                const game = d3.select(`#game-${game_id}`);
+                const classed = !game.classed("col-12");
+                game.classed("col-12", classed);
+                if(classed){
+                    game.node().scrollIntoView();
+                }
+        }
         function ratioString(numerator, denominator){
             if(denominator > 0){
                 return `${numerator}/${denominator} (${Math.round(numerator/denominator*100)}%)`; // e.g. '33/99 (33%)'
@@ -246,33 +321,79 @@
             }
         }
 
-        function last_n(data, key) {
+        function last_n(data, key, n=10) {
             // see https://stackoverflow.com/a/1129270
             return data.sort((a,b) => a[key] - b[key])
-                        .slice(0, 10)
+                        .slice(0, n)
                         .reverse();
         }
 
-        d3.csv('data/games.csv', function (games) {
-            d3.csv('data/ranking.csv', function(rankings) {
-                d3.csv('data/teams.csv', function(teams){
-                    d3.csv('data/games_details_2021.csv', function(game_details) {
-                    const last_games_date = d3.max(games, r => r.GAME_DATE_EST);
-                    recent_games = games.filter(r => r.GAME_DATE_EST == last_games_date);
-                    drawGames(recent_games, teams, game_details);
+        function calculateRankings(games_this_season, teams) {
+             return teams.map(team => {
+                const team_id = team.TEAM_ID;
+                // could optimize with const team_games = games_this_season.filter(d => d.TEAM_ID_home == team); const wins = d3.sum((team == d.TEAM_ID_home && d.HOME_TEAM_WINS) || (team == d.TEAM_ID_away && !d.HOME_TEAM_WINS))
+                const home_games = games_this_season.filter(d => d.TEAM_ID_home == team_id);
+                const away_games = games_this_season.filter(d => d.TEAM_ID_away == team_id);
+                const wins = d3.sum(home_games, d => d.HOME_TEAM_WINS) + d3.sum(away_games, d => 1-d.HOME_TEAM_WINS);
+                const games = home_games.length + away_games.length;
+                return {
+                    TEAM_ID: team_id,
+                    TEAM: teams.filter(d => d.TEAM_ID == team_id)[0].CITY,
+                    W: wins,
+                    L: games-wins,
+                    W_PCT: wins/games,
+                    CONFERENCE: TEAM_CONFERENCE_MAP[team_id]
+                };
+             }).sort((a,b) => b["W_PCT"]-a["W_PCT"]); // see https://stackoverflow.com/a/1129270
+        }
 
-                    // first, drawing from the csv
-                    // for recent games, I'll need to create this myself from games.csv or pull the data myself
-                    // probably best to calculate this on the fly for load speed
-                    const last_rankings_date = d3.max(rankings, r => r.STANDINGSDATE);
+        // need a way to map teams to their conference, since I'm excluding ranking.csv, which was not updated since 2019
+        var TEAM_CONFERENCE_MAP = {
+            1610612756: 'West',
+            1610612744: 'West', 
+            1610612763: 'West', 
+            1610612762: 'West', 
+            1610612742: 'West', 
+            1610612743: 'West', 
+            1610612750: 'West', 
+            1610612746: 'West', 
+            1610612747: 'West', 
+            1610612740: 'West', 
+            1610612757: 'West', 
+            1610612759: 'West', 
+            1610612758: 'West', 
+            1610612760: 'West', 
+            1610612745: 'West', 
+            1610612748: 'East', 
+            1610612749: 'East', 
+            1610612755: 'East', 
+            1610612741: 'East', 
+            1610612738: 'East', 
+            1610612739: 'East', 
+            1610612761: 'East', 
+            1610612751: 'East', 
+            1610612766: 'East', 
+            1610612737: 'East', 
+            1610612764: 'East', 
+            1610612752: 'East', 
+            1610612754: 'East', 
+            1610612765: 'East', 
+            1610612753: 'East', 
+        };
+        d3.csv('data/games.csv', function (games) {
+            d3.csv('data/teams.csv', function(teams){
+                d3.csv('data/games_details_2021.csv', function(game_details) {
                     const games_this_season = games.filter(d => d.SEASON == '2021');
-                    recent_rankings = rankings.filter(r => r.STANDINGSDATE == last_rankings_date);
-                    drawRankings(recent_rankings, games_this_season, teams);
-                    });
+
+                    // calculate rankings, since ranking.csv was not updated since 2019
+                    const recent_rankings = calculateRankings(games_this_season, teams);
+                    drawRankings(recent_rankings, games_this_season, game_details, teams);
+
+                    const selected_games = last_n(games_this_season, 'GAME_DATE_EST', 50);
+                    drawGames(selected_games, teams, game_details);
                 });
             });
         });
-
 
     </script>
 
