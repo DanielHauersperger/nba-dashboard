@@ -34,6 +34,7 @@
 <body>
     <!-- <div class="row row-cols-1"> -->
         <div class="col-12 col-lg-8 mx-auto">
+            <h1>NBA Dashboard</h1>
             <div class="row row-cols-1 row-cols-sm-2 g-4">
                 <div class="col">
                 <div class="card shadow-sm">
@@ -54,6 +55,9 @@
             <!-- below styling based on https://codepen.io/Temmio/pen/gKGEYV -->
             <div id="games" style="overflow-x: auto;" class="row flex-row flex-nowrap mt-4 pb-4 pt-2">
             </div>
+
+            <div id="teamStats" class="row">
+            </div>
     
         </div>
 
@@ -70,10 +74,6 @@
             const east = d3.select("#east-rankings");
             const east_rankings = rankings.filter(r => r.CONFERENCE == "East");
             drawTable(east, east_rankings, keys_to_display, display_names, "TEAM_ID");
-            
-            // TODO: Clicking a row filters games shown to that team, e.g. row.onclick=changeGamesFilter(this.team)
-            // Alternately, can have sidebar open to team info
-            // Or, lazily expand a card with the info
 
             for(team of rankings){
                 // Add a bar plot of recent performance for each team
@@ -99,22 +99,32 @@
                 d3.select(`#row-${team_id}`).on("click", () => {
                     const row = d3.select(`#row-${team_id}`);
                     const classed = d3.select(`#row-${team_id}`).classed("bg-primary");
-                    if (classed) {
+                    if (classed) { // (the already selected team is clicked again)
                         // row is currently selected, so un-select it
                         row.classed("bg-primary", false);
 
                         // remove the filter
+                        // const selected_games_details = // TODO
+                        // const selected_games_details = game_details.filter(d => d.TEAM_ID == team_id);
                         const selected_games = last_n(games_this_season, 'GAME_DATE_EST', 50);
-                        drawGames(selected_games, teams, game_details); 
+
+                        drawGames(selected_games, teams, game_details);
+
+                        // hide team stats
+                        d3.select("#teamStats").selectAll("*").remove();  
                     } else {
                         // row not currently selected, so un-select all others and select it
                         d3.selectAll("tr").classed("bg-primary", false);
                         row.classed("bg-primary", true);
                         row.classed("bg-info", false); // remove hover effect from row
                         
-                        // filter games by this team
+                        // show games only for this team
+                        const team_game_details = game_details.filter(d => d.TEAM_ID == team_id);
                         const team_games = games_this_season.filter(d => d.TEAM_ID_home == team_id || d.TEAM_ID_away == team_id);
-                        drawGames(team_games, teams, game_details); 
+                        drawGames(team_games, teams, game_details);
+
+                        // show team stats
+                        drawTeamStats(team_id, team_game_details);
                     }
                 });
             }
@@ -380,6 +390,40 @@
             1610612765: 'East', 
             1610612753: 'East', 
         };
+
+        function drawTeamStats(team_id, team_game_details) {
+            // start with a clean slate
+            d3.select("#teamStats").selectAll("*").remove(); 
+
+            // get unique players, see https://stackoverflow.com/a/35092559
+            const players = [...new Set(team_game_details.map(d => d.PLAYER_ID))];
+
+            // calculate stats for each player
+            const summary_player = players.map(player_id => {
+                const player_details = team_game_details.filter(d => d.PLAYER_ID == player_id);
+                const games = d3.sum(player_details, d => d.MIN ? 1 : 0);
+                const player_sum = (key) => d3.sum(player_details, d => d[key]);
+                const player_avg = (key) => Math.round(player_sum(key)/games) || 0;
+
+                return {
+                    "Player": player_details[0].PLAYER_NAME,
+                    "Games": games,
+                    "Points": player_avg('PTS'),
+                    "Field Goals": ratioString(player_avg('FGM'), player_avg('FGA')),
+                    "3 Point": ratioString(player_avg('FG3M'), player_avg('FG3A')),
+                    "FT": ratioString(player_avg('FTM'), player_avg('FTA')),
+                    "REB": player_avg('REB'),
+                    "AST": player_avg('AST'),
+                    "BLK": player_avg('BLK'),
+                    "TO": player_avg('TO'),
+                };
+            }).sort((a,b) => b["Points"]-a["Points"]); // see https://stackoverflow.com/a/1129270;
+            const columns = Object.keys(summary_player[0]); 
+            const teamStats_div = d3.select("#teamStats");
+            teamStats_div.append("h5").text("Season Stats per Game")
+            drawTable(teamStats_div, summary_player, columns, columns);
+        }
+
         d3.csv('data/games.csv', function (games) {
             d3.csv('data/teams.csv', function(teams){
                 d3.csv('data/games_details_2021.csv', function(game_details) {
