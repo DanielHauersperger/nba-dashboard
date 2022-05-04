@@ -53,6 +53,8 @@
 <body>
     <!-- <div class="row row-cols-1"> -->
         <div class="col-12 col-lg-8 mx-auto">
+            <a href="documentation.html">About Page</a>
+            <a href="https://youtu.be/U9Be861eN8U">Demo on YouTube</a>
             <h1>NBA Dashboard</h1>
             <div class="row row-cols-1 row-cols-sm-2 g-4">
                 <div class="col">
@@ -101,7 +103,7 @@
                 const team_games = games_this_season.filter(d => d.HOME_TEAM_ID == team_id || d.AWAY_TEAM_ID == team_id);
 
                 const last_10_games = last_n(team_games, "GAME_DATE_EST");
-                const display = last_10_games.map(d => ({"key": d.GAME_DATE_EST, "value":d.PTS_away - d.PTS_home}));
+                const display = last_10_games.map(d => ({"key": d.GAME_DATE_EST, "value":d.PTS_home - d.PTS_away}));
                 drawSmallBar(`TEAM-${team_id}`, display);
 
                 // When a team is clicked, filter games to that team
