@@ -29,6 +29,25 @@
         /* word-break:break-all; */
         overflow: auto;
     }
+
+    /* below styles from https://codepen.io/stonetip/pen/zoeeOd */
+    path {
+        stroke: steelblue;
+        stroke-width: 2;
+        fill: none;
+    }
+    .axis path, .axis line {
+        fill: none;
+        stroke: grey;
+        stroke-width: 1;
+        shape-rendering: crispEdges;
+    }
+    .ref {
+        fill: none;
+        stroke: grey;
+        stroke-width: 1;
+        shape-rendering: crispEdges;
+    }
 </style>
 
 <body>
@@ -331,6 +350,68 @@
             }
         }
 
+        function drawSmallLine(svg_id, input_data) {
+                data = input_data.map((d,i) => ({
+                    ...d,
+                    num: i+1
+                }));
+                // line chart is based on https://codepen.io/stonetip/pen/zoeeOd
+                var margin = {
+                    top: 5,
+                    right: 15,
+                    bottom: 5,
+                    left: 20
+                };
+                var width = 100 - margin.left - margin.right;
+                var height = 20 - margin.top - margin.bottom;
+
+
+                var x = d3.scale.linear().range([0, width]);
+                var y = d3.scale.linear().range([height, 0]);
+
+                const X_DOMAIN = d3.extent(data.map(d => +d.num));
+                const Y_DOMAIN = d3.extent(data.map(d => +d.PTS));
+                x.domain(X_DOMAIN);
+                y.domain(Y_DOMAIN);
+                var xAxis = d3.svg.axis().scale(x)
+                    .orient("bottom").ticks(1);
+
+                var yAxis = d3.svg.axis().scale(y)
+                    .orient("left").ticks(1);
+
+                var valueline = d3.svg.line()
+                    .x(d => x(d.num))
+                    .y(d => y(d.PTS));
+
+                var svg = d3.select(`#${svg_id}`)
+                    .append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                svg.append("path") // Add the valueline path.
+                .attr("d", valueline(data));
+
+                // add reference line, see https://stackoverflow.com/a/11785295
+                const Y_AVG = d3.sum(data.map(d => +d.PTS))/data.length;
+                const data2 = [
+                    {num: X_DOMAIN[0], PTS: Y_AVG},
+                    {num: X_DOMAIN[1], PTS: Y_AVG}
+                ];
+                var valueline2 = d3.svg.line()
+                    .x(d => x(d.num))
+                    .y(d => y(d.PTS));
+                svg.append("path") // Add the valueline path.
+                    .attr("d", valueline2(data2))
+                    .classed("ref", true);
+
+                // Add text with the mean (to the right of the line)
+                svg.append("text").text(Math.round(Y_AVG)).attr("x", width+margin.left/6).attr("y", (margin.top+height)/2).style("font-size", "10px");
+        }
+
+        
+        
         function last_n(data, key, n=10) {
             // see https://stackoverflow.com/a/1129270
             return data.sort((a,b) => a[key] - b[key])
@@ -404,8 +485,8 @@
                 const games = d3.sum(player_details, d => d.MIN ? 1 : 0);
                 const player_sum = (key) => d3.sum(player_details, d => d[key]);
                 const player_avg = (key) => Math.round(player_sum(key)/games) || 0;
-
                 return {
+                    "PLAYER_ID": player_details[0].PLAYER_ID,
                     "Player": player_details[0].PLAYER_NAME,
                     "Games": games,
                     "Points": player_avg('PTS'),
@@ -418,10 +499,18 @@
                     "TO": player_avg('TO'),
                 };
             }).sort((a,b) => b["Points"]-a["Points"]); // see https://stackoverflow.com/a/1129270;
-            const columns = Object.keys(summary_player[0]); 
+            const columns = Object.keys(summary_player[0]).filter(d => d !== 'PLAYER_ID');
             const teamStats_div = d3.select("#teamStats");
             teamStats_div.append("h5").text("Season Stats per Game")
-            drawTable(teamStats_div, summary_player, columns, columns);
+            drawTable(teamStats_div, summary_player, columns, columns, "PLAYER_ID");
+
+            // add sparkline for each player
+            for(player of summary_player) {
+                const player_details = last_n(team_game_details.filter(d => d.MIN).filter(d => d.PLAYER_ID == player.PLAYER_ID), 'GAME_ID', 10);
+                if(player_details && player_details.length > 4){
+                    drawSmallLine(`Player-${player.PLAYER_ID}`, player_details);
+                }
+            }
         }
 
         d3.csv('data/games.csv', function (games) {
